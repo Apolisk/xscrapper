@@ -1,7 +1,7 @@
 import json
 import logging
-import os
 import random
+import re
 import time
 from urllib.parse import urlencode
 
@@ -11,81 +11,110 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("run.log"), 
+        logging.FileHandler("run.log"),
         logging.StreamHandler(),
     ],
 )
-
 logger = logging.getLogger(__name__)
 
 class TwitterScraper:
-    def __init__(self, auth_token: str, ct0: str, twid: str, bearer_token: str, proxies: dict = None):
+    def __init__(self, proxies: dict = None):
         self.session = requests.Session()
-        # self.session.proxies(proxies)
-        self.bearer_token = bearer_token
+        if proxies:
+            self.session.proxies.update(proxies)
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "*/*",
-                "Accept-Language": "en-US,en;q=0.9",
-                "Accept-Encoding": "gzip, deflate, br, zstd",
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.bearer_token}",
-                "x-twitter-auth-type": "OAuth2Session",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+                "x-client-transaction-id": "K5/Dr0yJcemq+ttw1DUKspl7o+Bny3boWRBVqsJqtK0u6XZjzQidXY3/TFJMuQ+s8XvpPS6QYyxXFTJNWLPss1I7vbTmKA",
                 "x-twitter-active-user": "yes",
-                "x-twitter-client-language": "en",
-                "x-csrf-token": ct0,
-            }
-        )
-        self.session.cookies.update(
-            {
-                "auth_token": auth_token,
-                "ct0": ct0,
-                "twid": twid,
+                "x-twitter-client-language": "ru",
+                "content-type": "application/json",
             }
         )
 
+        self.bearer_token = self._get_bearer_token()
+        self.session.headers.update({"authorization": f"Bearer {self.bearer_token}"})
+
+        self.guest_token = self._get_guest_token()
+        self.session.headers.update({"x-guest-token": self.guest_token})
+
+    def _get_bearer_token(self) -> str:
+        url = "https://abs.twimg.com/responsive-web/client-web/main.e46e1035.js"
+        try:
+            response = self.session.get(url)
+            bearer_token = re.search(r"s=\"([\w\%]{104})\"", response.text)[1]
+            return bearer_token
+        except Exception as e:
+            logger.error(f"Error while reciving bearer token: {e}")
+        return None
+
+    def _get_guest_token(self) -> str:
+        url = "https://api.x.com/1.1/guest/activate.json"
+        try:
+            response = self.session.post(url)
+            if response.status_code == 200:
+                token = response.json().get("guest_token")
+                return token
+            else:
+                logger.error(response.text)
+        except Exception as e:
+            logger.error(f"Error while reciving guest token: {e}")
+        return None
+
     def _random_delay(self):
-        time.sleep(random.uniform(1, 3))
+        time.sleep(random.uniform(2, 4))
 
     def get_user_by_screen_name(self, username: str):
         query_id = "-oaLodhGbbnzJBACb1kk2Q"
+
         variables = {"screen_name": username, "withSafetyModeUserFields": True}
+
         features = {
-            "hidden_profile_subscriptions_enabled": True,
             "profile_label_improvements_pcf_label_in_post_enabled": True,
             "responsive_web_profile_redirect_enabled": False,
             "rweb_tipjar_consumption_enabled": True,
             "verified_phone_label_enabled": False,
             "subscriptions_verification_info_is_identity_verified_enabled": True,
             "subscriptions_verification_info_verified_since_enabled": True,
+            "hidden_profile_subscriptions_enabled": True,
             "highlights_tweets_tab_ui_enabled": True,
-            "responsive_web_twitter_article_notes_tab_enabled": True,
             "subscriptions_feature_can_gift_premium": True,
+            "responsive_web_twitter_article_notes_tab_enabled": True,
             "creator_subscriptions_tweet_preview_api_enabled": True,
             "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
             "responsive_web_graphql_timeline_navigation_enabled": True,
         }
-        fieldtoggles = {"withPayments": False, "withAuxiliaryUserLabels": False}
+
+        fieldToggles = {"withPayments": False, "withAuxiliaryUserLabels": True}
+
         params = {
             "variables": json.dumps(variables),
             "features": json.dumps(features),
-            "fieldToggles": json.dumps(fieldtoggles),
+            "fieldToggles": json.dumps(fieldToggles),
         }
-        url = f"https://x.com/i/api/graphql/{query_id}/UserByScreenName?{urlencode(params)}"
+
+        url = (
+            f"https://api.x.com/graphql/{query_id}/UserByScreenName?{urlencode(params)}"
+        )
 
         self._random_delay()
-        response = self.session.get(url)
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logging.info(f"Error: {response.status_code}")
-            logging.info(response.text)
+        try:
+            self._random_delay()
+            response = self.session.get(url)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"Error: {response.status_code}")
+                logger.error(response.text)
+                return None
+        except Exception as e:
+            logger.error(f"Request error: {e}")
             return None
 
     def get_user_tweets(self, user_id: str, count: int = 10):
-        query_id = "-V26I6Pb5xDZ3C7BWwCQ_Q"
+        query_id = "YtN4Mzhm80AHZL5danComw"
+
         variables = {
             "userId": user_id,
             "count": count,
@@ -93,6 +122,7 @@ class TwitterScraper:
             "withQuickPromoteEligibilityTweetFields": True,
             "withVoice": True,
         }
+
         features = {
             "rweb_video_screen_enabled": False,
             "profile_label_improvements_pcf_label_in_post_enabled": True,
@@ -106,9 +136,10 @@ class TwitterScraper:
             "communities_web_enable_tweet_community_results_fetch": True,
             "c9s_tweet_anatomy_moderator_badge_enabled": True,
             "responsive_web_grok_analyze_button_fetch_trends_enabled": False,
-            "responsive_web_grok_analyze_post_followups_enabled": True,
+            "responsive_web_grok_analyze_post_followups_enabled": False,
             "responsive_web_jetfuel_frame": True,
             "responsive_web_grok_share_attachment_enabled": True,
+            "responsive_web_grok_annotations_enabled": False,
             "articles_preview_enabled": True,
             "responsive_web_edit_tweet_api_enabled": True,
             "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
@@ -118,6 +149,7 @@ class TwitterScraper:
             "tweet_awards_web_tipping_enabled": False,
             "responsive_web_grok_show_grok_translated_post": False,
             "responsive_web_grok_analysis_button_from_backend": True,
+            "post_ctas_fetch_enabled": True,
             "creator_subscriptions_quote_tweet_preview_enabled": False,
             "freedom_of_speech_not_reach_fetch_enabled": True,
             "standardized_nudges_misinfo": True,
@@ -128,23 +160,36 @@ class TwitterScraper:
             "responsive_web_grok_imagine_annotation_enabled": True,
             "responsive_web_grok_community_note_auto_translation_is_enabled": False,
             "responsive_web_enhance_cards_enabled": False,
+            "responsive_web_twitter_article_notes_tab_enabled": True,
+            "subscriptions_verification_info_verified_since_enabled": True,
+            "subscriptions_verification_info_is_identity_verified_enabled": True,
+            "hidden_profile_subscriptions_enabled": True,
+            "highlights_tweets_tab_ui_enabled": True,
+            "subscriptions_feature_can_gift_premium": True,
         }
+
         fieldToggles = {"withArticlePlainText": False}
+
         params = {
             "variables": json.dumps(variables),
             "features": json.dumps(features),
             "fieldToggles": json.dumps(fieldToggles),
         }
-        url = f"https://x.com/i/api/graphql/{query_id}/UserTweets?{urlencode(params)}"
+
+        url = f"https://api.x.com/graphql/{query_id}/UserTweets?{urlencode(params)}"
 
         self._random_delay()
 
-        response = self.session.get(url=url, headers={"Accept-Encoding": "identity"})
-        if response.status_code == 200:
-            return response.json()
-        else:
-            logging.info(f"Error: {response.status_code}")
-            logging.info(response.text)
+        try:
+            response = self.session.get(url)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error(f"Error: {response.status_code}")
+                logger.error(response.text)
+                return None
+        except Exception as e:
+            logger.error(f"Request error: {e}")
             return None
 
     def parse_tweets(self, data: dict) -> list[dict]:
@@ -153,7 +198,7 @@ class TwitterScraper:
             instructions = data["data"]["user"]["result"]["timeline"]["timeline"]["instructions"]
             for instruction in instructions:
                 if instruction.get("type") == "TimelineAddEntries":
-                    for entry in instruction.get("entries", [])[:11]:
+                    for entry in instruction.get("entries", [])[:10]:
                         if "tweet-" in entry.get("entryId", ""):
                             item_content = entry.get("content", {}).get(
                                 "itemContent", {}
@@ -166,14 +211,6 @@ class TwitterScraper:
                                 tweet_info = {
                                     "id": legacy.get("id_str"),
                                     "text": legacy.get("full_text"),
-                                    "created_at": legacy.get("created_at"),
-                                    "retweet_count": legacy.get("retweet_count"),
-                                    "favorite_count": legacy.get("favorite_count"),
-                                    "reply_count": legacy.get("reply_count"),
-                                    "quote_count": legacy.get("quote_count"),
-                                    "views": tweet_result.get("views", {}).get(
-                                        "count", 0
-                                    ),
                                 }
                                 tweets.append(tweet_info)
 
@@ -184,33 +221,22 @@ class TwitterScraper:
 
 
 if __name__ == "__main__":
-    #proxies = {
-    # "http": "http://your-proxy-ip:port",
-    # "https": "http://your-proxy-ip:port",
+    # proxies = {
+    #     "http": "http://your-proxy-ip:port",
+    #     "https": "http://your-proxy-ip:port",
     # }
 
-    scraper = TwitterScraper(
-        auth_token=os.getenv("AUTH_TOKEN"),
-        ct0=os.getenv("CT0"),
-        twid=os.getenv("TWID"),
-        bearer_token=os.getenv("BEARER_TOKEN"),
-    )
+    scraper = TwitterScraper()
 
-    logging.info("Fetching user information...")
-    user_data = scraper.get_user_by_screen_name("testerlabor")
+    username = "BRICSinfo"
+
+    logging.info("Fetching profile information...")
+    user_data = scraper.get_user_by_screen_name(username)
+
     if user_data:
         user_id = user_data["data"]["user"]["result"]["rest_id"]
         user_name = user_data["data"]["user"]["result"]["core"]["name"]
-        followers_count = user_data["data"]["user"]["result"]["legacy"][
-            "followers_count"
-        ]
-        friends_count = user_data["data"]["user"]["result"]["legacy"]["friends_count"]
-        logging.info(
-            f"\nUser ID: {user_id}\n"
-            f"User Name: {user_name}\n"
-            f"Followers Count: {followers_count}\n"
-            f"Friends Count: {friends_count}"
-        )
+        logging.info(f"\nUser ID: {user_id}\n" f"User Name: {user_name}\n")
 
         logging.info("Fetching tweets...")
         tweets_data = scraper.get_user_tweets(user_id, count=10)

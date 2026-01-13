@@ -1,8 +1,7 @@
 ## How to Run the Script
 
 1. Install dependencies.
-2. Setup .env variables(get it from browser)
-3. Run the script using:
+2. Run the script using:
 
 ```sh
 python twitter_scanario.py
