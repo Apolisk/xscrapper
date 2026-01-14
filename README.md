@@ -1,21 +1,41 @@
-## How to Run the Script
+## Description
 
-1. Install dependencies.
-2. Run the script using:
-
-```sh
-python twitter_scanario.py
-```
+This project automates tweet retrieval from Twitter without using browser automation.  
+It sends HTTP requests, processes the response data, and writes each tweet to a new line in an output file.
 
 ## Dependencies
 
 - Python 3.8+
 - `pip install -r requirements.txt`
 
-## Description
+## Parameters
+The script exposes configurable parameters via method arguments.
 
-This project automates tweet retrieval from Twitter without using browser automation.  
-It sends HTTP requests, processes the response data, and writes each tweet to a new line in an output file.
+```username```
+- Type: str
+- Default: elonmusk
+
+```count```
+- Type: int
+- Default: 10
+
+## Usage
+
+#### Example #1 (using defalut params)
+```python
+scraper = TwitterScraper()
+user_data = scraper.get_user_by_screen_name()
+user_id = user_data["data"]["user"]["result"]["rest_id"]
+tweets_data = scraper.get_user_tweets(user_id)
+```
+
+#### Example #2 (specify own params)
+```python
+scraper = TwitterScraper()
+user_data = scraper.get_user_by_screen_name(username="cow")
+user_id = user_data["data"]["user"]["result"]["rest_id"]
+tweets_data = scraper.get_user_tweets(user_id, count=20)
+```
 
 ## Known Limitations
 

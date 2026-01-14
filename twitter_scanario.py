@@ -3,6 +3,7 @@ import logging
 import random
 import re
 import time
+from typing import Optional
 from urllib.parse import urlencode
 
 import requests
@@ -64,7 +65,7 @@ class TwitterScraper:
     def _random_delay(self):
         time.sleep(random.uniform(2, 4))
 
-    def get_user_by_screen_name(self, username: str):
+    def get_user_by_screen_name(self, username: Optional[str] = "elonmusk"): # or username: str = "elonmusk"
         query_id = "-oaLodhGbbnzJBACb1kk2Q"
 
         variables = {"screen_name": username, "withSafetyModeUserFields": True}
@@ -112,9 +113,8 @@ class TwitterScraper:
             logger.error(f"Request error: {e}")
             return None
 
-    def get_user_tweets(self, user_id: str, count: int = 10):
+    def get_user_tweets(self, user_id: str, count: Optional[int] = 10): # or count: int = 10
         query_id = "YtN4Mzhm80AHZL5danComw"
-
         variables = {
             "userId": user_id,
             "count": count,
@@ -228,18 +228,16 @@ if __name__ == "__main__":
 
     scraper = TwitterScraper()
 
-    username = "BRICSinfo"
 
     logging.info("Fetching profile information...")
-    user_data = scraper.get_user_by_screen_name(username)
-
+    user_data = scraper.get_user_by_screen_name()
     if user_data:
         user_id = user_data["data"]["user"]["result"]["rest_id"]
         user_name = user_data["data"]["user"]["result"]["core"]["name"]
         logging.info(f"\nUser ID: {user_id}\n" f"User Name: {user_name}\n")
 
         logging.info("Fetching tweets...")
-        tweets_data = scraper.get_user_tweets(user_id, count=10)
+        tweets_data = scraper.get_user_tweets(user_id)
         tweets = scraper.parse_tweets(tweets_data)
         if tweets_data:
             with open("tweets.txt", "w", encoding="utf-8") as f:
