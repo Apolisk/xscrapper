@@ -9,7 +9,7 @@ It sends HTTP requests, processes the response data, and writes each tweet to a 
 - `pip install -r requirements.txt`
 
 ## Parameters
-The script exposes configurable parameters via method arguments.
+The script accepts the following parameters via the command line:
 
 ```username```
 - Type: str
@@ -19,22 +19,21 @@ The script exposes configurable parameters via method arguments.
 - Type: int
 - Default: 10
 
+```proxy```
+- Type: str
+- Default: None 
+- Format: ```http://<ip>:<port>```
+
 ## Usage
 
 #### Example #1 (using defalut params)
 ```python
-scraper = TwitterScraper()
-user_data = scraper.get_user_by_screen_name()
-user_id = user_data["data"]["user"]["result"]["rest_id"]
-tweets_data = scraper.get_user_tweets(user_id)
+python3 twitter_scanario.py 
 ```
 
 #### Example #2 (specify own params)
 ```python
-scraper = TwitterScraper()
-user_data = scraper.get_user_by_screen_name(username="cow")
-user_id = user_data["data"]["user"]["result"]["rest_id"]
-tweets_data = scraper.get_user_tweets(user_id, count=20)
+python3 twitter_scanario.py --username BRICSinfo --count 20 --proxy http://127.0.0.1:8080
 ```
 
 ## Known Limitations

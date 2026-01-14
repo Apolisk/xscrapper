@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import random
@@ -192,13 +193,13 @@ class TwitterScraper:
             logger.error(f"Request error: {e}")
             return None
 
-    def parse_tweets(self, data: dict) -> list[dict]:
+    def parse_tweets(self, data: dict, count: int) -> list[dict]:
         tweets = []
         try:
             instructions = data["data"]["user"]["result"]["timeline"]["timeline"]["instructions"]
             for instruction in instructions:
                 if instruction.get("type") == "TimelineAddEntries":
-                    for entry in instruction.get("entries", [])[:10]:
+                    for entry in instruction.get("entries", [])[:count]:
                         if "tweet-" in entry.get("entryId", ""):
                             item_content = entry.get("content", {}).get(
                                 "itemContent", {}
@@ -221,24 +222,37 @@ class TwitterScraper:
 
 
 if __name__ == "__main__":
-    # proxies = {
-    #     "http": "http://your-proxy-ip:port",
-    #     "https": "http://your-proxy-ip:port",
-    # }
+    parser = argparse.ArgumentParser(description="Twitter scraper")
+    parser.add_argument(
+        "--username", type=str, default="elonmusk", help="Twitter username (without @)"
+    )
+    parser.add_argument(
+        "--count", type=int, default=10, help="Number of tweets to fetch (default: 10)"
+    )
 
-    scraper = TwitterScraper()
+    parser.add_argument(
+        "--proxy", default=None, help="Proxy URL, example: http://ip:port"
+    )
 
+    args = parser.parse_args()
+    proxies = None
+    if args.proxy:
+        proxies = {
+            "http": args.proxy,
+        }
+
+    scraper = TwitterScraper(proxies=proxies)
 
     logging.info("Fetching profile information...")
-    user_data = scraper.get_user_by_screen_name()
+    user_data = scraper.get_user_by_screen_name(username=args.username)
     if user_data:
         user_id = user_data["data"]["user"]["result"]["rest_id"]
         user_name = user_data["data"]["user"]["result"]["core"]["name"]
         logging.info(f"\nUser ID: {user_id}\n" f"User Name: {user_name}\n")
 
         logging.info("Fetching tweets...")
-        tweets_data = scraper.get_user_tweets(user_id)
-        tweets = scraper.parse_tweets(tweets_data)
+        tweets_data = scraper.get_user_tweets(user_id, count=args.count)
+        tweets = scraper.parse_tweets(tweets_data, count=args.count)
         if tweets_data:
             with open("tweets.txt", "w", encoding="utf-8") as f:
                 for i, tweet in enumerate(tweets, 1):
